@@ -8,12 +8,17 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:flutter/foundation.dart'
     show defaultTargetPlatform, TargetPlatform;
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import './screens/signup_screen.dart';
 import './screens/welcome_screen.dart';
 import './screens/profile.dart';
 import './screens/login_screen.dart';
 import './screens/initial_home.dart';
+import 'package:http/http.dart' as http;
+import 'package:http_parser/http_parser.dart';
+import 'package:path/path.dart';
+import 'dart:convert';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -25,7 +30,7 @@ void main() async {
     sqfliteFfiInit();
     databaseFactory = databaseFactoryFfi;
   }
-
+  await dotenv.load();
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
 
   runApp(const FloraScanApp());
@@ -126,19 +131,6 @@ class _HomeScreenState extends State<HomeScreen> {
   int _currentIndex = 0;
   String? lastPhotoPath;
 
-  /*
-  void _takePhoto() async {
-    final ImagePicker picker = ImagePicker();
-    final XFile? photo = await picker.pickImage(source: ImageSource.camera);
-    if (photo != null) {
-      setState(() {
-        lastPhotoPath = photo.path;
-        _currentIndex = 1;
-      });
-    }
-  }
-  */
-
   void updateUserInfo(
     String newName,
     String newProfession,
@@ -184,7 +176,7 @@ class _HomeScreenState extends State<HomeScreen> {
       case 0:
         return InitialHomeScreen();
       case 1:
-        return Grade(); // Certifique-se que `Grade` está funcionando
+        return Grade();
       case 2:
         return ProfileScreen(
           userName: widget.name,
@@ -234,33 +226,7 @@ class _GradeState extends State<Grade> {
     final picker = ImagePicker();
     final XFile? novaFoto = await picker.pickImage(source: ImageSource.camera);
     if (novaFoto != null) {
-      // Pede nome, descrição e cuidados da foto
-      final resultado = await _pedirNomeDescricaoCuidadosDaFoto();
-      if (resultado != null && resultado['nome'] != null) {
-        try {
-          await DB.instance.insertPlanta({
-            'nome': resultado['nome']?.trim() ?? '',
-            'descricao': resultado['descricao']?.trim() ?? '',
-            'cuidados': resultado['cuidados']?.trim() ?? '',
-            'imagemPath': novaFoto.path,
-            'categoria_id': null,
-          });
-          await carregarPlantas(); // Recarrega a lista após a inserção
-        } catch (e) {
-          print('❌ Erro ao salvar planta: $e');
-          if (context.mounted) {
-            ScaffoldMessenger.of(
-              context,
-            ).showSnackBar(SnackBar(content: Text('Erro ao salvar planta.')));
-          }
-        }
-      } else {
-        if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Nome da planta é obrigatório.')),
-          );
-        }
-      }
+      await identificarPlanta(novaFoto.path);
     }
   }
 
@@ -270,86 +236,83 @@ class _GradeState extends State<Grade> {
       source: ImageSource.gallery,
     );
     if (imagemSelecionada != null) {
-      final resultado = await _pedirNomeDescricaoCuidadosDaFoto();
-      if (resultado != null && resultado['nome'] != null) {
-        try {
-          await DB.instance.insertPlanta({
-            'nome': resultado['nome']?.trim() ?? '',
-            'descricao': resultado['descricao']?.trim() ?? '',
-            'cuidados': resultado['cuidados']?.trim() ?? '',
-            'imagemPath': imagemSelecionada.path,
-            'categoria_id': null,
-          });
-          await carregarPlantas(); // Atualiza a grade
-        } catch (e) {
-          print('❌ Erro ao salvar planta da galeria: $e');
-          if (context.mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Erro ao salvar planta.')),
-            );
-          }
-        }
-      } else {
-        if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Nome da planta é obrigatório.')),
-          );
-        }
-      }
+      await identificarPlanta(imagemSelecionada.path);
     }
   }
 
-  // Função para pedir nome, descrição e cuidados da foto
-  Future<Map<String, String?>?> _pedirNomeDescricaoCuidadosDaFoto() async {
-    String nomeDigitado = '';
-    String descricaoDigitada = '';
-    String cuidadosDigitados = '';
-
-    return showDialog<Map<String, String?>?>(
-      context: context,
-      builder: (context) {
-        return AlertDialog(
-          title: const Text('Dados da Flor'),
-          content: SingleChildScrollView(
-            // Adicionado SingleChildScrollView
-            child: Column(
-              children: [
-                TextField(
-                  autofocus: true,
-                  onChanged: (value) => nomeDigitado = value,
-                  decoration: const InputDecoration(hintText: 'Nome da planta'),
-                ),
-                const SizedBox(height: 10),
-                TextField(
-                  onChanged: (value) => descricaoDigitada = value,
-                  decoration: const InputDecoration(hintText: 'Descrição'),
-                ),
-                const SizedBox(height: 10),
-                TextField(
-                  onChanged: (value) => cuidadosDigitados = value,
-                  decoration: const InputDecoration(hintText: 'Cuidados'),
-                ),
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: const Text('Cancelar'),
-            ),
-            ElevatedButton(
-              onPressed:
-                  () => Navigator.of(context).pop({
-                    'nome': nomeDigitado,
-                    'descricao': descricaoDigitada,
-                    'cuidados': cuidadosDigitados,
-                  }),
-              child: const Text('Salvar'),
-            ),
-          ],
-        );
-      },
+  Future<void> identificarPlanta(String imagePath) async {
+    final uri = Uri.parse(
+      'https://my-api.plantnet.org/v2/identify/all?api-key=2b101pP92wbLhY6TqTbkv1lBtO&lang=pt-br&nb-results=3',
     );
+
+    final request = http.MultipartRequest('POST', uri);
+
+    request.files.add(
+      await http.MultipartFile.fromPath(
+        'images',
+        imagePath,
+        contentType: MediaType('image', 'jpeg'),
+        filename: basename(imagePath),
+      ),
+    );
+
+    request.fields['organs'] = 'auto';
+
+    try {
+      final response = await request.send();
+
+      if (response.statusCode == 200) {
+        final body = await response.stream.bytesToString();
+        final json = jsonDecode(body);
+
+        if (json['results'] != null && (json['results'] as List).isNotEmpty) {
+          final species = json['results'][0]['species'];
+          final nomeCientifico =
+              species['scientificNameWithoutAuthor']?.toString().trim() ?? '';
+          final commonNamesList = species['commonNames'];
+          String nomeComum = '';
+
+          if (commonNamesList is List && commonNamesList.isNotEmpty) {
+            nomeComum =
+                commonNamesList.map((e) => e.toString()).join(', ').trim();
+          }
+
+          print('🌿 Nome científico: $nomeCientifico');
+          print('📚 Nome(s) comum(ns): $nomeComum');
+
+          if (nomeCientifico.isNotEmpty) {
+            try {
+              await DB.instance.insertPlanta({
+                'nome': nomeCientifico,
+                'descricao': nomeComum,
+                'cuidados': '',
+                'imagemPath': imagePath,
+                'categoria_id': null,
+              });
+
+              await carregarPlantas();
+
+              // Sem mensagem para o usuário aqui, pois tiramos o context
+            } catch (e) {
+              print('❌ Erro ao salvar planta: $e');
+              // Sem snackbar de erro
+            }
+          } else {
+            print('❌ Nome da planta é obrigatório.');
+            // Sem snackbar de aviso
+          }
+        } else {
+          print('❌ Nenhum resultado encontrado.');
+          // Sem snackbar
+        }
+      } else {
+        print('❌ Erro na identificação: ${response.statusCode}');
+        // Sem snackbar
+      }
+    } catch (e) {
+      print('❌ Erro ao identificar planta: $e');
+      // Sem snackbar
+    }
   }
 
   @override
@@ -472,9 +435,10 @@ class _GradeState extends State<Grade> {
 }
 
 // Widget para exibir os detalhes da foto em um modal
+
 class FotoDetalhe extends StatelessWidget {
   final Map<String, dynamic> planta;
-  final VoidCallback onPlantaExcluida; // Callback para通知 atualização
+  final VoidCallback onPlantaExcluida;
 
   const FotoDetalhe({
     super.key,
@@ -485,12 +449,12 @@ class FotoDetalhe extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final imagemPath = planta['imagemPath'];
+    final String? cuidados = planta['cuidados'];
 
     return Dialog(
       child: Padding(
         padding: const EdgeInsets.all(16.0),
         child: SingleChildScrollView(
-          // Adicionado para evitar overflow
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -511,8 +475,8 @@ class FotoDetalhe extends StatelessWidget {
                     borderRadius: BorderRadius.circular(8.0),
                     child: Image.file(
                       File(imagemPath),
-                      height: 200, // Altura fixa para a imagem no modal
-                      width: 200, // Largura fixa
+                      height: 200,
+                      width: 200,
                       fit: BoxFit.cover,
                     ),
                   ),
@@ -530,7 +494,51 @@ class FotoDetalhe extends StatelessWidget {
                 "💧 Cuidados:",
                 style: TextStyle(fontWeight: FontWeight.bold),
               ),
-              Text(planta['cuidados'] ?? 'Sem cuidados'),
+              cuidados == null || cuidados.isEmpty
+                  ? ElevatedButton(
+                    onPressed: () async {
+                      print('Botão "Adicionar Cuidados" clicado');
+                      final nomeCientifico = planta['nome'];
+                      if (nomeCientifico != null && nomeCientifico.isNotEmpty) {
+                        final novosCuidados = await detalhesPlantaAI(
+                          nomeCientifico,
+                        );
+                        print(novosCuidados);
+                        // if (novosCuidados != null) {
+                        //   final plantaAtualizada = Map<String, dynamic>.from(
+                        //     planta,
+                        //   );
+                        //   plantaAtualizada['cuidados'] = novosCuidados;
+
+                        //   final resultado = await DB.instance.updatePlanta(
+                        //     plantaAtualizada,
+                        //   );
+                        //   if (context.mounted) {
+                        //     ScaffoldMessenger.of(context).showSnackBar(
+                        //       SnackBar(
+                        //         content: Text(
+                        //           resultado > 0
+                        //               ? 'Cuidados atualizados com sucesso!'
+                        //               : 'Falha ao atualizar planta.',
+                        //         ),
+                        //       ),
+                        //     );
+                        //     Navigator.of(
+                        //       context,
+                        //     ).pop(); // Fecha e força recarregar
+                        //   }
+                        // }
+                      }
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.green,
+                    ),
+                    child: const Text(
+                      'Adicionar Cuidados',
+                      style: TextStyle(color: Colors.white),
+                    ),
+                  )
+                  : Text(cuidados),
               const SizedBox(height: 20),
               Row(
                 mainAxisAlignment: MainAxisAlignment.end,
@@ -544,22 +552,18 @@ class FotoDetalhe extends StatelessWidget {
                   const SizedBox(width: 8),
                   ElevatedButton(
                     onPressed: () async {
-                      // Excluir a planta do banco de dados
                       if (planta['id'] != null) {
-                        // Verifique se o ID está presente
                         try {
                           await DB.instance.deletePlanta(planta['id']);
-                          // Remover o item da lista e atualizar a grade.
                           if (context.mounted) {
                             Navigator.of(context).pop();
-                            onPlantaExcluida(); // Chama o callback
+                            onPlantaExcluida();
                           }
                         } catch (e) {
                           print('Erro ao excluir planta: $e');
-                          // Mostrar mensagem de erro ao usuário (opcional)
                           if (context.mounted) {
                             ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
+                              const SnackBar(
                                 content: Text('Erro ao excluir planta.'),
                               ),
                             );
@@ -582,5 +586,80 @@ class FotoDetalhe extends StatelessWidget {
         ),
       ),
     );
+  }
+}
+
+Future<String?> detalhesPlantaAI(String nomeCientifico) async {
+  print('Botão "Adicionar Cuidados" função');
+
+  const endpoint =
+      'https://plantscan.openai.azure.com/openai/deployments/plantscan-chat/chat/completions?api-version=2025-01-01-preview';
+
+  final apiKey = dotenv.env['AZURE_OPENAI_KEY'];
+
+  if (apiKey == null || apiKey.isEmpty) {
+    print('❌ API Key não encontrada no .env!');
+    return null;
+  }
+
+  final headers = {'Content-Type': 'application/json', 'api-key': apiKey};
+
+  final prompt = '''
+Me dê informações sobre a planta "$nomeCientifico". Use obrigatoriamente o seguinte formato JSON:
+
+{
+  "quantidade_ideal_de_agua": "Regar 2x por semana",
+  "tipo_de_solo": "arenoso",
+  "bioma_adequado": "temperado",
+  "outras_plantas_compatíveis": "ardósia"
+}
+''';
+
+  final body = jsonEncode({
+    'model': 'gpt-4.1-mini',
+    'messages': [
+      {
+        'role': 'system',
+        'content':
+            'Você é um assistente de jardinagem. Sempre responda em JSON.',
+      },
+      {'role': 'user', 'content': prompt},
+    ],
+    'max_tokens': 500,
+    'temperature': 0.7,
+  });
+
+  try {
+    final response = await http.post(
+      Uri.parse(endpoint),
+      headers: headers,
+      body: body,
+    );
+
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body);
+      final respostaJson = data['choices'][0]['message']['content'];
+
+      try {
+        final parsed = jsonDecode(respostaJson);
+        final textoFormatado = '''
+💧 Água: ${parsed['quantidade_ideal_de_agua']}
+🌱 Solo: ${parsed['tipo_de_solo']}
+🌍 Bioma: ${parsed['bioma_adequado']}
+🌿 Harmoniza com: ${parsed['outras_plantas_compatíveis']}
+''';
+        return textoFormatado;
+      } catch (e) {
+        print('⚠️ Erro ao interpretar JSON da resposta: $e');
+        return null;
+      }
+    } else {
+      print('❌ Erro na resposta: ${response.statusCode}');
+      print(response.body);
+      return null;
+    }
+  } catch (e) {
+    print('❌ Erro ao conectar com Azure OpenAI: $e');
+    return null;
   }
 }
