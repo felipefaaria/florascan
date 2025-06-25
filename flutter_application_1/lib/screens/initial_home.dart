@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_application_1/screens/caretips.dart';
 import 'package:google_fonts/google_fonts.dart';
 import './my_garden.dart';
 
@@ -50,7 +51,12 @@ class InitialHomeScreen extends StatelessWidget {
               ),
               SizedBox(height: 20),
               OutlinedButton.icon(
-                onPressed: () {},
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => CaretipsScreen()),
+                  );
+                },
                 icon: Icon(Icons.local_florist),
                 label: Text("Dicas de Cuidados"),
               ),

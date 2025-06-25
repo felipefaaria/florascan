@@ -32,7 +32,7 @@ class _LoginChoiceScreenState extends State<LoginChoiceScreen> {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             const Text(
-              "Você precisa fazer login para continuar.",
+              "Você pode se conectar com sua conta ou continuar como convidado.",
               style: TextStyle(fontSize: 18),
               textAlign: TextAlign.center,
             ),

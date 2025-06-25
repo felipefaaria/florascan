@@ -157,14 +157,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
     // Tela para usuários não logados ou anônimos
     if (user == null || user.isAnonymous) {
       return Scaffold(
-        appBar: AppBar(
-          // Mantido AppBar para a tela de convidado, pois não está em um BottomNavBar
-          title: Text(
-            'Perfil',
-            style: GoogleFonts.lato(fontWeight: FontWeight.bold),
-          ),
-          centerTitle: true,
-        ),
         body: Center(
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 30),
