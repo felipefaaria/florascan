@@ -11,8 +11,7 @@ Future<Map<String, String>?> detalhesPlantaAI(String nomeCientifico) async {
 
   // ATENÇÃO: Em uma aplicação real, a API Key não deve ser exposta diretamente no código.
   // Considere usar variáveis de ambiente ou um serviço de backend seguro.
-  final apiKey =
-      '6eOaXJsaVb1JPixRHmws7NUlyBYBjwaTzvy99y7ksNz4ML0PaAceJQQJ99BEACZoyfiXJ3w3AAABACOGnT9O';
+  final apiKey = '';
 
   if (apiKey.isEmpty) {
     print('❌ API Key não encontrada! Verifique sua configuração.');
