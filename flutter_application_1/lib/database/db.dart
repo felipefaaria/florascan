@@ -22,12 +22,12 @@ class DB {
     ); // Imprimindo o caminho do banco de dados
     return await openDatabase(
       path,
-      version: 2, // <-- VERSÃO DO BANCO DE DADOS ATUALIZADA PARA 2
+      version: 3, // <-- VERSÃO DO BANCO DE DADOS ATUALIZADA PARA 3
       onConfigure: (db) async {
         await db.execute('PRAGMA foreign_keys = ON');
       },
       onCreate: _onCreate,
-      onUpgrade: _onUpgrade, // Mudado de _onUpgradeSafe para _onUpgrade
+      onUpgrade: _onUpgrade,
     );
   }
 
@@ -56,21 +56,45 @@ class DB {
         FOREIGN KEY (categoria_id) REFERENCES categoria(id) ON DELETE SET NULL
       );
     ''');
+
+    // NOVO: Cria tabela de Usuários
+    await db.execute('''
+      CREATE TABLE users (
+        email TEXT PRIMARY KEY,
+        name TEXT,
+        profession TEXT,
+        phone TEXT
+      );
+    ''');
   }
 
   // Função de upgrade para lidar com mudanças de esquema
   Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
-    // Se a versão antiga for menor que 2, recriamos as tabelas para incluir os novos campos
     if (oldVersion < 2) {
       debugPrint(
         'Executando upgrade do banco de dados de v$oldVersion para v$newVersion...',
       );
       await db.execute('DROP TABLE IF EXISTS plantas;');
       await db.execute('DROP TABLE IF EXISTS categoria;');
-      await _onCreate(db, newVersion);
-      debugPrint('Upgrade completo: tabelas recriadas com novos campos.');
+      await _onCreate(
+        db,
+        2,
+      ); // Recria as tabelas antigas se a versão for menor que 2
     }
-    // Adicione mais blocos `if (oldVersion < X)` para futuras migrações
+    if (oldVersion < 3) {
+      // Adiciona a tabela 'users' se estiver atualizando da versão 2 para 3
+      debugPrint(
+        'Adicionando tabela "users" no upgrade de v$oldVersion para v$newVersion...',
+      );
+      await db.execute('''
+        CREATE TABLE users (
+          email TEXT PRIMARY KEY,
+          name TEXT,
+          profession TEXT,
+          phone TEXT
+        );
+      ''');
+    }
   }
 
   // Inserir categoria
@@ -158,7 +182,7 @@ class DB {
     ''');
   }
 
-  // NOVO: Buscar plantas por categoria_id
+  // Buscar plantas por categoria_id
   Future<List<Map<String, dynamic>>> getPlantasByCategoria(
     int categoriaId,
   ) async {
@@ -175,5 +199,53 @@ class DB {
   Future<List<Map<String, dynamic>>> getCategorias() async {
     final db = await database;
     return await db.query('categoria', orderBy: 'nome ASC'); // Ordena por nome
+  }
+
+  // NOVO: Inserir ou atualizar dados do usuário
+  Future<int> insertOrUpdateUser(Map<String, dynamic> user) async {
+    final db = await database;
+    final email = user['email'];
+    if (email == null) {
+      debugPrint(
+        '❌ Erro: Email do usuário não fornecido para inserção/atualização.',
+      );
+      return 0;
+    }
+    // Tenta atualizar. Se nenhuma linha for afetada, insere.
+    final rowsAffected = await db.update(
+      'users',
+      user,
+      where: 'email = ?',
+      whereArgs: [email],
+      conflictAlgorithm:
+          ConflictAlgorithm
+              .replace, // Garante que se o email existir, ele substitui
+    );
+    if (rowsAffected == 0) {
+      // Se não atualizou, tenta inserir
+      return await db.insert(
+        'users',
+        user,
+        conflictAlgorithm: ConflictAlgorithm.replace,
+      );
+    }
+    debugPrint(
+      'Usuário com email $email atualizado/inserido. Linhas afetadas: $rowsAffected',
+    );
+    return rowsAffected;
+  }
+
+  // NOVO: Buscar dados do usuário por email
+  Future<Map<String, dynamic>?> getUserByEmail(String email) async {
+    final db = await database;
+    final result = await db.query(
+      'users',
+      where: 'email = ?',
+      whereArgs: [email],
+    );
+    if (result.isNotEmpty) {
+      return result.first;
+    }
+    return null;
   }
 }

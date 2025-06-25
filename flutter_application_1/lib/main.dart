@@ -188,7 +188,6 @@ class _HomeScreenState extends State<HomeScreen> {
           email: widget.email,
           phone: widget.phone,
           onUpdate: updateUserInfo,
-          correctPassword: widget.password,
         );
       default:
         return InitialHomeScreen();
