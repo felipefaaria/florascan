@@ -14,7 +14,7 @@ import './screens/signup_screen.dart';
 import './screens/welcome_screen.dart';
 import './screens/profile.dart';
 import './screens/login_screen.dart';
-import './screens/initial_home.dart';
+import './screens/initial_home.dart'; // Importa a tela inicial
 import 'package:http/http.dart' as http;
 import 'package:http_parser/http_parser.dart';
 import 'package:path/path.dart'
@@ -22,6 +22,7 @@ import 'package:path/path.dart'
 import 'dart:convert'; // Necessário para jsonDecode/jsonEncode na identificação de planta
 
 import 'package:flutter_application_1/widgets/plant_details_modal.dart'; // Importa o modal componentizado
+// import 'package:flutter_application_1/screens/my_garden_screen.dart'; // Removido, já que o acesso é por botão
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -168,6 +169,7 @@ class _HomeScreenState extends State<HomeScreen> {
             label: "Fotos",
           ),
           BottomNavigationBarItem(icon: Icon(Icons.person), label: "Perfil"),
+          // REMOVIDO: BottomNavigationBarItem(icon: Icon(Icons.forest), label: "Jardim"),
         ],
       ),
     );
@@ -176,7 +178,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _getPage(int index) {
     switch (index) {
       case 0:
-        return InitialHomeScreen();
+        return InitialHomeScreen(); // Tela inicial com o botão "Meu Jardim"
       case 1:
         return Grade();
       case 2:
@@ -358,12 +360,16 @@ class _GradeState extends State<Grade> {
                             opaque:
                                 false, // Permite que o conteúdo abaixo seja visto
                             pageBuilder:
-                                (BuildContext context, _, __) =>
-                                    PlantDetailsModal(
-                                      // Usando o novo widget
-                                      planta: planta,
-                                      onPlantaExcluida: carregarPlantas,
-                                    ),
+                                (
+                                  BuildContext context,
+                                  _,
+                                  __,
+                                ) => PlantDetailsModal(
+                                  // Usando o novo widget
+                                  planta: planta,
+                                  onPlantaExcluida:
+                                      carregarPlantas, // O callback para Grade recarregar
+                                ),
                             transitionsBuilder: (
                               context,
                               animation,

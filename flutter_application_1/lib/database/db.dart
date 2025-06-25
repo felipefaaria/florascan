@@ -36,7 +36,7 @@ class DB {
     await db.execute('''
       CREATE TABLE categoria (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
-        nome TEXT NOT NULL
+        nome TEXT NOT NULL UNIQUE
       );
     ''');
 
@@ -76,7 +76,26 @@ class DB {
   // Inserir categoria
   Future<int> insertCategoria(String nome) async {
     final db = await database;
-    return await db.insert('categoria', {'nome': nome});
+    try {
+      return await db.insert('categoria', {'nome': nome});
+    } catch (e) {
+      debugPrint('Erro ao inserir categoria: $e');
+      rethrow; // Relança o erro para ser tratado no UI
+    }
+  }
+
+  // Buscar categoria por nome
+  Future<Map<String, dynamic>?> getCategoriaByName(String nome) async {
+    final db = await database;
+    final result = await db.query(
+      'categoria',
+      where: 'nome = ?',
+      whereArgs: [nome],
+    );
+    if (result.isNotEmpty) {
+      return result.first;
+    }
+    return null;
   }
 
   // Inserir planta e retornar todos os elementos da tabela plantas no console
@@ -139,9 +158,22 @@ class DB {
     ''');
   }
 
+  // NOVO: Buscar plantas por categoria_id
+  Future<List<Map<String, dynamic>>> getPlantasByCategoria(
+    int categoriaId,
+  ) async {
+    final db = await database;
+    return await db.query(
+      'plantas',
+      where: 'categoria_id = ?',
+      whereArgs: [categoriaId],
+      orderBy: 'nome ASC', // Ordena pelo nome para uma lista organizada
+    );
+  }
+
   // Buscar todas as categorias
   Future<List<Map<String, dynamic>>> getCategorias() async {
     final db = await database;
-    return await db.query('categoria');
+    return await db.query('categoria', orderBy: 'nome ASC'); // Ordena por nome
   }
 }

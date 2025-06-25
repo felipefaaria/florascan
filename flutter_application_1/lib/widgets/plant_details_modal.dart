@@ -9,7 +9,8 @@ import 'package:flutter_application_1/widgets/care_detail_card.dart'; // Importa
 /// Permite adicionar cuidados via IA e excluir a planta.
 class PlantDetailsModal extends StatefulWidget {
   final Map<String, dynamic> planta;
-  final VoidCallback onPlantaExcluida;
+  final VoidCallback
+  onPlantaExcluida; // Callback para notificar sobre exclusão ou adição ao jardim
 
   const PlantDetailsModal({
     super.key,
@@ -177,6 +178,247 @@ class _PlantDetailsModalState extends State<PlantDetailsModal> {
     setState(() {
       _isLoadingCare = false;
     });
+  }
+
+  Future<void> _showAddToGardenDialog() async {
+    List<Map<String, dynamic>> categories = await DB.instance.getCategorias();
+    TextEditingController newCategoryController = TextEditingController();
+
+    int?
+    selectedCategoryId; // Variável para armazenar o ID da categoria selecionada
+
+    await showModalBottomSheet(
+      context: context,
+      isScrollControlled: true, // Permite que o sheet ocupe mais espaço
+      builder: (BuildContext sheetContext) {
+        return StatefulBuilder(
+          // Use StatefulBuilder para atualizar o estado dentro do sheet
+          builder: (BuildContext context, StateSetter setModalState) {
+            return Padding(
+              padding: EdgeInsets.only(
+                bottom: MediaQuery.of(context).viewInsets.bottom,
+                top: 50.0, // Aumentada a margem superior
+              ),
+              child: Card(
+                // Adicionado Card para o design
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(
+                    15.0,
+                  ), // Bordas arredondadas para o Card
+                ),
+
+                child: Padding(
+                  padding: const EdgeInsets.all(
+                    20.0,
+                  ), // Padding interno para o conteúdo do Card
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        'Adicionar "${_currentPlanta['nome'] ?? 'esta planta'}" ao Jardim',
+                        style: GoogleFonts.lato(
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.green[800],
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 20), // Aumento do espaçamento
+                      TextField(
+                        controller: newCategoryController,
+                        decoration: InputDecoration(
+                          labelText: 'Nome do novo jardim',
+                          hintText: 'Ex: Meu Jardim Secreto',
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide.none,
+                          ),
+                          filled: true,
+                          fillColor: const Color(0xFFEFFAF1), // Verde bem sutil
+                          contentPadding: const EdgeInsets.symmetric(
+                            vertical: 14.0,
+                            horizontal: 16.0,
+                          ),
+                        ),
+                        style: GoogleFonts.lato(
+                          fontSize: 16,
+                          color:
+                              Colors
+                                  .grey
+                                  .shade700, // Cinza mais sutil para o texto
+                        ),
+                      ),
+                      const SizedBox(height: 15), // Aumento do espaçamento
+                      ElevatedButton.icon(
+                        onPressed: () async {
+                          final newCategoryName =
+                              newCategoryController.text.trim();
+                          if (newCategoryName.isNotEmpty) {
+                            try {
+                              final existingCategory = await DB.instance
+                                  .getCategoriaByName(newCategoryName);
+                              if (existingCategory != null) {
+                                _showMessageOverlay(
+                                  'Jardim com este nome já existe.',
+                                  backgroundColor: Colors.orange,
+                                );
+                                selectedCategoryId = existingCategory['id'];
+                                Navigator.of(
+                                  sheetContext,
+                                ).pop(); // Fecha o sheet
+                              } else {
+                                final newId = await DB.instance.insertCategoria(
+                                  newCategoryName,
+                                );
+                                _showMessageOverlay(
+                                  'Jardim "$newCategoryName" criado!',
+                                  backgroundColor: Colors.green,
+                                );
+                                selectedCategoryId = newId;
+                                // Recarrega as categorias no modal para exibir a nova
+                                categories = await DB.instance.getCategorias();
+                                setModalState(
+                                  () {},
+                                ); // Atualiza o estado do sheet
+                                Navigator.of(
+                                  sheetContext,
+                                ).pop(); // Fecha o sheet
+                              }
+                            } catch (e) {
+                              _showMessageOverlay(
+                                'Erro ao criar jardim: $e',
+                                backgroundColor: Colors.red,
+                              );
+                              Navigator.of(
+                                sheetContext,
+                              ).pop(); // Fecha o sheet em caso de erro
+                            }
+                          } else {
+                            _showMessageOverlay(
+                              'Nome do jardim não pode ser vazio.',
+                              backgroundColor: Colors.orange,
+                            );
+                          }
+                        },
+                        icon: const Icon(Icons.add, color: Colors.white),
+                        label: const Text(
+                          'Criar Novo Jardim',
+                          style: TextStyle(color: Colors.white, fontSize: 16),
+                        ),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.green,
+                          minimumSize: const Size.fromHeight(
+                            50,
+                          ), // Largura total e altura maior
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ), // Bordas mais arredondadas
+                          elevation: 4, // Sombra para o botão
+                        ),
+                      ),
+                      const SizedBox(height: 20), // Aumento do espaçamento
+                      Text(
+                        'Ou selecione um jardim existente:',
+                        style: GoogleFonts.lato(
+                          fontSize: 17,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.green[700],
+                        ), // Estilo aprimorado
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 10),
+                      if (categories.isEmpty)
+                        const Padding(
+                          padding: EdgeInsets.symmetric(vertical: 10.0),
+                          child: Text(
+                            'Nenhum jardim existente.',
+                            style: TextStyle(color: Colors.grey),
+                          ),
+                        )
+                      else
+                        Expanded(
+                          // Permite que a lista de categorias role
+                          child: ListView.builder(
+                            shrinkWrap:
+                                true, // Para a ListView dentro de Column
+                            itemCount: categories.length,
+                            itemBuilder: (context, index) {
+                              final category = categories[index];
+                              return Card(
+                                margin: const EdgeInsets.symmetric(
+                                  vertical: 6.0,
+                                ), // Mais espaço entre os cards
+                                elevation: 2,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                                child: ListTile(
+                                  leading: const Icon(
+                                    Icons.folder,
+                                    color: Colors.orange,
+                                  ), // Ícone de pasta
+                                  title: Text(
+                                    category['nome'],
+                                    style: GoogleFonts.lato(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                  trailing: const Icon(
+                                    Icons.arrow_forward_ios,
+                                    size: 18,
+                                    color: Colors.grey,
+                                  ),
+                                  onTap: () {
+                                    selectedCategoryId = category['id'];
+                                    Navigator.of(
+                                      sheetContext,
+                                    ).pop(); // Fecha o sheet
+                                  },
+                                ),
+                              );
+                            },
+                          ),
+                        ),
+                      const SizedBox(height: 10),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+
+    if (selectedCategoryId != null) {
+      // Atualiza a planta com a categoria selecionada
+      _currentPlanta['categoria_id'] = selectedCategoryId;
+
+      final plantaParaAtualizar = Map<String, dynamic>.from(_currentPlanta);
+      plantaParaAtualizar.remove(
+        'categoria_nome',
+      ); // Remove chave não existente no DB
+
+      final resultado = await DB.instance.updatePlanta(plantaParaAtualizar);
+
+      if (mounted) {
+        if (resultado > 0) {
+          _showMessageOverlay(
+            'Planta adicionada ao jardim!',
+            backgroundColor: Colors.green,
+          );
+          await _reloadPlantaDetails(); // Recarrega para mostrar a categoria no modal
+          widget
+              .onPlantaExcluida(); // Notifica a Grade/MyGardenScreen para recarregar
+        } else {
+          _showMessageOverlay(
+            'Falha ao adicionar planta ao jardim.',
+            backgroundColor: Colors.red,
+          );
+        }
+      }
+    }
   }
 
   @override
@@ -393,64 +635,90 @@ class _PlantDetailsModalState extends State<PlantDetailsModal> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.end,
                 children: [
-                  TextButton(
-                    onPressed: () {
-                      Navigator.of(context).pop();
-                    },
-                    style: TextButton.styleFrom(
-                      foregroundColor: Colors.red[600],
-                    ),
-                    child: const Text(
-                      'Fechar',
-                      style: TextStyle(fontSize: 16, color: Colors.red),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  ElevatedButton(
-                    onPressed: () async {
-                      if (_currentPlanta['id'] != null) {
-                        try {
-                          await DB.instance.deletePlanta(_currentPlanta['id']);
-                          if (mounted) {
-                            _showMessageOverlay(
-                              'Planta excluída com sucesso!',
-                              backgroundColor: Colors.grey,
+                  // Botão "Excluir" (agora à esquerda, ou seja, aparece antes no código)
+                  Flexible(
+                    // Permite que o botão se ajuste ao espaço disponível
+                    child: ElevatedButton.icon(
+                      onPressed: () async {
+                        if (_currentPlanta['id'] != null) {
+                          try {
+                            await DB.instance.deletePlanta(
+                              _currentPlanta['id'],
                             );
-                            Navigator.of(
-                              context,
-                            ).pop(); // Fecha o PlantDetailsModal
-                            widget
-                                .onPlantaExcluida(); // Notifica a Grade para recarregar
-                          }
-                        } catch (e) {
-                          print('Erro ao excluir planta: $e');
-                          if (mounted) {
-                            _showMessageOverlay(
-                              'Erro ao excluir planta.',
-                              backgroundColor: Colors.red,
-                            );
+                            if (mounted) {
+                              _showMessageOverlay(
+                                'Planta excluída com sucesso!',
+                                backgroundColor: Colors.grey,
+                              );
+                              Navigator.of(
+                                context,
+                              ).pop(); // Fecha o PlantDetailsModal
+                              widget
+                                  .onPlantaExcluida(); // Notifica a Grade para recarregar
+                            }
+                          } catch (e) {
+                            print('Erro ao excluir planta: $e');
+                            if (mounted) {
+                              _showMessageOverlay(
+                                'Erro ao excluir planta.',
+                                backgroundColor: Colors.red,
+                              );
+                            }
                           }
                         }
-                      }
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.red,
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 20,
-                        vertical: 12,
+                      },
+                      icon: const Icon(
+                        Icons.delete_outline,
+                        color: Colors.white,
                       ),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10),
+                      label: const Text(
+                        'Excluir',
+                        style: TextStyle(color: Colors.white, fontSize: 16),
                       ),
-                      elevation: 3,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.red,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 20,
+                          vertical: 12,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        elevation: 3,
+                      ),
                     ),
-                    child: const Text(
-                      'Excluir',
-                      style: TextStyle(color: Colors.white, fontSize: 16),
+                  ),
+                  const SizedBox(width: 12), // Espaço entre os botões
+                  // Botão "Adicionar ao Jardim" (agora à direita, ou seja, aparece depois no código)
+                  Flexible(
+                    // Permite que o botão se ajuste ao espaço disponível
+                    child: ElevatedButton.icon(
+                      onPressed: _showAddToGardenDialog,
+                      icon: const Icon(
+                        Icons.add_circle_outline,
+                        color: Colors.white,
+                      ),
+                      label: const Text(
+                        'Adicionar ao Jardim',
+                        style: TextStyle(color: Colors.white, fontSize: 16),
+                      ),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor:
+                            Colors.blueGrey, // Cor diferente para distinção
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 20,
+                          vertical: 12,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        elevation: 3,
+                      ),
                     ),
                   ),
                 ],
               ),
+              const SizedBox(height: 10), // Espaço extra para o rodapé
             ],
           ),
         ),
