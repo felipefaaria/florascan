@@ -8,7 +8,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:flutter/foundation.dart'
     show defaultTargetPlatform, TargetPlatform;
-import 'package:flutter_dotenv/flutter_dotenv.dart';
+// import 'package:flutter_dotenv/flutter_dotenv.dart'; // Descomente se estiver usando dotenv
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import './screens/signup_screen.dart';
 import './screens/welcome_screen.dart';
@@ -17,8 +17,11 @@ import './screens/login_screen.dart';
 import './screens/initial_home.dart';
 import 'package:http/http.dart' as http;
 import 'package:http_parser/http_parser.dart';
-import 'package:path/path.dart';
-import 'dart:convert';
+import 'package:path/path.dart'
+    as path_pkg; // Usando alias para evitar conflitos de nome
+import 'dart:convert'; // Necessário para jsonDecode/jsonEncode na identificação de planta
+
+import 'package:flutter_application_1/widgets/plant_details_modal.dart'; // Importa o modal componentizado
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -30,8 +33,10 @@ void main() async {
     sqfliteFfiInit();
     databaseFactory = databaseFactoryFfi;
   }
-  await dotenv.load();
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+
+  // Carrega o arquivo .env se for usado
+  // await dotenv.load(fileName: ".env");
 
   runApp(const FloraScanApp());
 }
@@ -75,7 +80,7 @@ class FloraScanApp extends StatelessWidget {
           ),
         ),
       ),
-      home: AuthGate(),
+      home: const AuthGate(),
     );
   }
 }
@@ -88,20 +93,17 @@ class AuthGate extends StatelessWidget {
     return StreamBuilder<User?>(
       stream: FirebaseAuth.instance.authStateChanges(),
       builder: (context, snapshot) {
-        // Ainda carregando
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Scaffold(
             body: Center(child: CircularProgressIndicator()),
           );
         }
 
-        // Usuário logado
         if (snapshot.hasData) {
-          return HomeScreen(); // Exibe a tela principal com menu
+          return HomeScreen();
         }
 
-        // Não logado
-        return WelcomeScreen(); // Tela inicial para login/cadastro
+        return const WelcomeScreen();
       },
     );
   }
@@ -116,11 +118,11 @@ class HomeScreen extends StatefulWidget {
 
   HomeScreen({
     super.key,
-    this.name = '', // Definindo valores padrão
+    this.name = '',
     this.profession = '',
     this.email = '',
     this.phone = '',
-    this.password = '', // Definindo valores padrão
+    this.password = '',
   });
 
   @override
@@ -252,7 +254,7 @@ class _GradeState extends State<Grade> {
         'images',
         imagePath,
         contentType: MediaType('image', 'jpeg'),
-        filename: basename(imagePath),
+        filename: path_pkg.basename(imagePath), // Usando o alias aqui
       ),
     );
 
@@ -287,31 +289,28 @@ class _GradeState extends State<Grade> {
                 'descricao': nomeComum,
                 'cuidados': '',
                 'imagemPath': imagePath,
+                'agua': 'N/A',
+                'solo': 'N/A',
+                'bioma': 'N/A',
+                'harmonizacao': 'N/A',
                 'categoria_id': null,
               });
 
               await carregarPlantas();
-
-              // Sem mensagem para o usuário aqui, pois tiramos o context
             } catch (e) {
               print('❌ Erro ao salvar planta: $e');
-              // Sem snackbar de erro
             }
           } else {
             print('❌ Nome da planta é obrigatório.');
-            // Sem snackbar de aviso
           }
         } else {
           print('❌ Nenhum resultado encontrado.');
-          // Sem snackbar
         }
       } else {
         print('❌ Erro na identificação: ${response.statusCode}');
-        // Sem snackbar
       }
     } catch (e) {
       print('❌ Erro ao identificar planta: $e');
-      // Sem snackbar
     }
   }
 
@@ -344,9 +343,7 @@ class _GradeState extends State<Grade> {
           plantas.isEmpty
               ? const Center(child: Text('Nenhuma foto tirada ainda :('))
               : Padding(
-                padding: const EdgeInsets.only(
-                  top: 24.0,
-                ), // margem maior no topo
+                padding: const EdgeInsets.only(top: 24.0),
                 child: GridView.count(
                   crossAxisCount: 3,
                   children: List.generate(plantas.length, (index) {
@@ -354,22 +351,38 @@ class _GradeState extends State<Grade> {
                     final imagemPath = planta['imagemPath'];
                     return GestureDetector(
                       onTap: () {
-                        showDialog(
-                          context: context,
-                          builder:
-                              (context) => FotoDetalhe(
-                                planta: planta,
-                                onPlantaExcluida: carregarPlantas,
-                              ),
+                        // Usando PageRouteBuilder para um modal flutuante de tela cheia
+                        Navigator.push(
+                          context,
+                          PageRouteBuilder(
+                            opaque:
+                                false, // Permite que o conteúdo abaixo seja visto
+                            pageBuilder:
+                                (BuildContext context, _, __) =>
+                                    PlantDetailsModal(
+                                      // Usando o novo widget
+                                      planta: planta,
+                                      onPlantaExcluida: carregarPlantas,
+                                    ),
+                            transitionsBuilder: (
+                              context,
+                              animation,
+                              secondaryAnimation,
+                              child,
+                            ) {
+                              return FadeTransition(
+                                opacity: animation,
+                                child: child,
+                              );
+                            },
+                          ),
                         );
                       },
                       child: Container(
                         margin: const EdgeInsets.all(8.0),
                         decoration: BoxDecoration(
-                          color: Colors.grey[200], // cinza claro
-                          borderRadius: BorderRadius.circular(
-                            12.0,
-                          ), // borda arredondada
+                          color: Colors.grey[200],
+                          borderRadius: BorderRadius.circular(12.0),
                           boxShadow: [
                             BoxShadow(
                               color: Colors.black.withOpacity(0.1),
@@ -431,235 +444,5 @@ class _GradeState extends State<Grade> {
                 ),
               ),
     );
-  }
-}
-
-// Widget para exibir os detalhes da foto em um modal
-
-class FotoDetalhe extends StatelessWidget {
-  final Map<String, dynamic> planta;
-  final VoidCallback onPlantaExcluida;
-
-  const FotoDetalhe({
-    super.key,
-    required this.planta,
-    required this.onPlantaExcluida,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final imagemPath = planta['imagemPath'];
-    final String? cuidados = planta['cuidados'];
-
-    return Dialog(
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Center(
-                child: Text(
-                  planta['nome'] ?? 'Sem nome',
-                  style: GoogleFonts.lato(
-                    fontSize: 22,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ),
-              const SizedBox(height: 10),
-              if (imagemPath != null && File(imagemPath).existsSync())
-                Center(
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(8.0),
-                    child: Image.file(
-                      File(imagemPath),
-                      height: 200,
-                      width: 200,
-                      fit: BoxFit.cover,
-                    ),
-                  ),
-                )
-              else
-                const Center(child: Icon(Icons.image_not_supported, size: 100)),
-              const SizedBox(height: 10),
-              Text(
-                "🌿 Descrição:",
-                style: TextStyle(fontWeight: FontWeight.bold),
-              ),
-              Text(planta['descricao'] ?? 'Sem descrição'),
-              const SizedBox(height: 10),
-              Text(
-                "💧 Cuidados:",
-                style: TextStyle(fontWeight: FontWeight.bold),
-              ),
-              cuidados == null || cuidados.isEmpty
-                  ? ElevatedButton(
-                    onPressed: () async {
-                      print('Botão "Adicionar Cuidados" clicado');
-                      final nomeCientifico = planta['nome'];
-                      if (nomeCientifico != null && nomeCientifico.isNotEmpty) {
-                        final novosCuidados = await detalhesPlantaAI(
-                          nomeCientifico,
-                        );
-                        print(novosCuidados);
-                        // if (novosCuidados != null) {
-                        //   final plantaAtualizada = Map<String, dynamic>.from(
-                        //     planta,
-                        //   );
-                        //   plantaAtualizada['cuidados'] = novosCuidados;
-
-                        //   final resultado = await DB.instance.updatePlanta(
-                        //     plantaAtualizada,
-                        //   );
-                        //   if (context.mounted) {
-                        //     ScaffoldMessenger.of(context).showSnackBar(
-                        //       SnackBar(
-                        //         content: Text(
-                        //           resultado > 0
-                        //               ? 'Cuidados atualizados com sucesso!'
-                        //               : 'Falha ao atualizar planta.',
-                        //         ),
-                        //       ),
-                        //     );
-                        //     Navigator.of(
-                        //       context,
-                        //     ).pop(); // Fecha e força recarregar
-                        //   }
-                        // }
-                      }
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.green,
-                    ),
-                    child: const Text(
-                      'Adicionar Cuidados',
-                      style: TextStyle(color: Colors.white),
-                    ),
-                  )
-                  : Text(cuidados),
-              const SizedBox(height: 20),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: [
-                  TextButton(
-                    onPressed: () {
-                      Navigator.of(context).pop();
-                    },
-                    child: const Text('Fechar'),
-                  ),
-                  const SizedBox(width: 8),
-                  ElevatedButton(
-                    onPressed: () async {
-                      if (planta['id'] != null) {
-                        try {
-                          await DB.instance.deletePlanta(planta['id']);
-                          if (context.mounted) {
-                            Navigator.of(context).pop();
-                            onPlantaExcluida();
-                          }
-                        } catch (e) {
-                          print('Erro ao excluir planta: $e');
-                          if (context.mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text('Erro ao excluir planta.'),
-                              ),
-                            );
-                          }
-                        }
-                      }
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.red,
-                    ),
-                    child: const Text(
-                      'Excluir',
-                      style: TextStyle(color: Colors.white),
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-Future<String?> detalhesPlantaAI(String nomeCientifico) async {
-  print('Botão "Adicionar Cuidados" função');
-
-  const endpoint =
-      'https://plantscan.openai.azure.com/openai/deployments/plantscan-chat/chat/completions?api-version=2025-01-01-preview';
-
-  final apiKey = dotenv.env['AZURE_OPENAI_KEY'];
-
-  if (apiKey == null || apiKey.isEmpty) {
-    print('❌ API Key não encontrada no .env!');
-    return null;
-  }
-
-  final headers = {'Content-Type': 'application/json', 'api-key': apiKey};
-
-  final prompt = '''
-Me dê informações sobre a planta "$nomeCientifico". Use obrigatoriamente o seguinte formato JSON:
-
-{
-  "quantidade_ideal_de_agua": "Regar 2x por semana",
-  "tipo_de_solo": "arenoso",
-  "bioma_adequado": "temperado",
-  "outras_plantas_compatíveis": "ardósia"
-}
-''';
-
-  final body = jsonEncode({
-    'model': 'gpt-4.1-mini',
-    'messages': [
-      {
-        'role': 'system',
-        'content':
-            'Você é um assistente de jardinagem. Sempre responda em JSON.',
-      },
-      {'role': 'user', 'content': prompt},
-    ],
-    'max_tokens': 500,
-    'temperature': 0.7,
-  });
-
-  try {
-    final response = await http.post(
-      Uri.parse(endpoint),
-      headers: headers,
-      body: body,
-    );
-
-    if (response.statusCode == 200) {
-      final data = jsonDecode(response.body);
-      final respostaJson = data['choices'][0]['message']['content'];
-
-      try {
-        final parsed = jsonDecode(respostaJson);
-        final textoFormatado = '''
-💧 Água: ${parsed['quantidade_ideal_de_agua']}
-🌱 Solo: ${parsed['tipo_de_solo']}
-🌍 Bioma: ${parsed['bioma_adequado']}
-🌿 Harmoniza com: ${parsed['outras_plantas_compatíveis']}
-''';
-        return textoFormatado;
-      } catch (e) {
-        print('⚠️ Erro ao interpretar JSON da resposta: $e');
-        return null;
-      }
-    } else {
-      print('❌ Erro na resposta: ${response.statusCode}');
-      print(response.body);
-      return null;
-    }
-  } catch (e) {
-    print('❌ Erro ao conectar com Azure OpenAI: $e');
-    return null;
   }
 }

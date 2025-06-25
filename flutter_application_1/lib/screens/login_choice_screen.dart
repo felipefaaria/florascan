@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'welcome_screen.dart';
 import './login_screen.dart';
 import './signup_screen.dart';
+import '../main.dart';
 
 class LoginChoiceScreen extends StatefulWidget {
   const LoginChoiceScreen({super.key});
@@ -54,6 +55,18 @@ class _LoginChoiceScreenState extends State<LoginChoiceScreen> {
                 Navigator.push(
                   context,
                   MaterialPageRoute(builder: (context) => const SignUpScreen()),
+                );
+              },
+            ),
+            const SizedBox(height: 16), // Espaço entre os botões
+            ElevatedButton.icon(
+              icon: const Icon(Icons.person), // Ícone para convidado
+              label: const Text("Entrar como convidado"),
+              onPressed: () {
+                // Navega para a HomeScreen substituindo a tela atual
+                Navigator.pushReplacement(
+                  context,
+                  MaterialPageRoute(builder: (context) => HomeScreen()),
                 );
               },
             ),

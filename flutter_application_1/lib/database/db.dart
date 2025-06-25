@@ -1,6 +1,6 @@
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
-import 'package:flutter/foundation.dart';
+import 'package:flutter/foundation.dart'; // Importado para debugPrint
 
 class DB {
   DB._();
@@ -22,12 +22,12 @@ class DB {
     ); // Imprimindo o caminho do banco de dados
     return await openDatabase(
       path,
-      version: 1,
+      version: 2, // <-- VERSÃO DO BANCO DE DADOS ATUALIZADA PARA 2
       onConfigure: (db) async {
         await db.execute('PRAGMA foreign_keys = ON');
       },
       onCreate: _onCreate,
-      onUpgrade: _onUpgradeSafe,
+      onUpgrade: _onUpgrade, // Mudado de _onUpgradeSafe para _onUpgrade
     );
   }
 
@@ -40,30 +40,37 @@ class DB {
       );
     ''');
 
-    // Cria tabela Plantas com relação 1:N
+    // Cria tabela Plantas com relação 1:N e os novos campos de cuidados
     await db.execute('''
       CREATE TABLE plantas (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         nome TEXT NOT NULL,
         descricao TEXT,
-        cuidados TEXT,
+        cuidados TEXT,        -- Mantido para compatibilidade ou uso futuro
         imagemPath TEXT,
+        agua TEXT,            -- NOVO CAMPO
+        solo TEXT,            -- NOVO CAMPO
+        bioma TEXT,           -- NOVO CAMPO
+        harmonizacao TEXT,    -- NOVO CAMPO
         categoria_id INTEGER,
         FOREIGN KEY (categoria_id) REFERENCES categoria(id) ON DELETE SET NULL
       );
     ''');
   }
 
-  Future<void> _onUpgradeSafe(
-    Database db,
-    int oldVersion,
-    int newVersion,
-  ) async {
-    if (oldVersion < newVersion) {
+  // Função de upgrade para lidar com mudanças de esquema
+  Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
+    // Se a versão antiga for menor que 2, recriamos as tabelas para incluir os novos campos
+    if (oldVersion < 2) {
+      debugPrint(
+        'Executando upgrade do banco de dados de v$oldVersion para v$newVersion...',
+      );
       await db.execute('DROP TABLE IF EXISTS plantas;');
       await db.execute('DROP TABLE IF EXISTS categoria;');
       await _onCreate(db, newVersion);
+      debugPrint('Upgrade completo: tabelas recriadas com novos campos.');
     }
+    // Adicione mais blocos `if (oldVersion < X)` para futuras migrações
   }
 
   // Inserir categoria
@@ -95,12 +102,19 @@ class DB {
   // Atualizar planta
   Future<int> updatePlanta(Map<String, dynamic> planta) async {
     final db = await database;
-    return await db.update(
+    final id = planta['id'];
+    if (id == null) {
+      debugPrint('❌ Erro: ID da planta não fornecido para atualização.');
+      return 0;
+    }
+    final rowsAffected = await db.update(
       'plantas',
       planta,
       where: 'id = ?',
-      whereArgs: [planta['id']],
+      whereArgs: [id],
     );
+    debugPrint('Planta com ID $id atualizada. Linhas afetadas: $rowsAffected');
+    return rowsAffected;
   }
 
   // Deletar planta
