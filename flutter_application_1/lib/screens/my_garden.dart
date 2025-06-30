@@ -327,8 +327,9 @@ class _MyGardenScreenState extends State<MyGardenScreen> {
                   _selectedCategoryId = category['id'];
                   _selectedCategoryName = category['nome'];
                 });
-                _handleDataReload(); // Carrega as plantas do jardim selecionado
+                _handleDataReload();
               },
+              onLongPress: () => _showDeleteCategoryDialog(category),
             ),
           );
         },
@@ -447,5 +448,51 @@ class _MyGardenScreenState extends State<MyGardenScreen> {
         },
       );
     }
+  }
+
+  /// NOVO: Exibe diálogo de confirmação para excluir jardim
+  Future<void> _showDeleteCategoryDialog(Map<String, dynamic> category) async {
+    await showDialog(
+      context: context,
+      builder: (BuildContext dialogContext) {
+        return AlertDialog(
+          title: const Text('Excluir Jardim'),
+          content: Text(
+            'Tem certeza que deseja excluir o jardim "${category['nome']}"?\n\nAs plantas serão removidas do jardim, mas não excluídas.',
+          ),
+          actions: [
+            TextButton(
+              child: const Text('Cancelar'),
+              onPressed: () => Navigator.of(dialogContext).pop(),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+              child: const Text(
+                'Excluir',
+                style: TextStyle(color: Colors.white),
+              ),
+              onPressed: () async {
+                try {
+                  await DB.instance.deleteCategoria(category['id']);
+                  if (mounted) {
+                    Navigator.of(dialogContext).pop();
+                    _loadCategories();
+                    _showMessage(
+                      'Jardim "${category['nome']}" excluído com sucesso!',
+                    );
+                  }
+                } catch (e) {
+                  print('Erro ao excluir jardim: $e');
+                  if (mounted) {
+                    Navigator.of(dialogContext).pop();
+                    _showMessage('Erro ao excluir jardim.', isError: true);
+                  }
+                }
+              },
+            ),
+          ],
+        );
+      },
+    );
   }
 }

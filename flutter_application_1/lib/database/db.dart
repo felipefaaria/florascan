@@ -248,4 +248,20 @@ class DB {
     }
     return null;
   }
+
+  // NOVO: Deletar categoria
+  Future<int> deleteCategoria(int id) async {
+    final db = await database;
+
+    // Primeiro remove a categoria_id das plantas associadas
+    await db.update(
+      'plantas',
+      {'categoria_id': null},
+      where: 'categoria_id = ?',
+      whereArgs: [id],
+    );
+
+    // Depois exclui a categoria
+    return await db.delete('categoria', where: 'id = ?', whereArgs: [id]);
+  }
 }
