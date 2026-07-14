@@ -1,21 +1,24 @@
 import 'dart:convert';
+import 'package:flutter/foundation.dart' show debugPrint;
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:http/http.dart' as http;
 
 /// Função para obter detalhes de cuidado da planta via API de IA.
 /// Recebe o nome científico da planta e retorna um mapa com os detalhes.
+///
+/// As credenciais do Azure OpenAI sao lidas das variaveis de ambiente
+/// (arquivo .env): AZURE_OPENAI_ENDPOINT e AZURE_OPENAI_API_KEY.
 Future<Map<String, String>?> detalhesPlantaAI(String nomeCientifico) async {
-  print('Iniciando função detalhesPlantaAI para: $nomeCientifico');
+  debugPrint('Iniciando função detalhesPlantaAI para: $nomeCientifico');
 
-  const endpoint =
-      'https://plantscan.openai.azure.com/openai/deployments/plantscan-chat/chat/completions?api-version=2025-01-01-preview';
+  final endpoint = dotenv.env['AZURE_OPENAI_ENDPOINT'] ?? '';
+  final apiKey = dotenv.env['AZURE_OPENAI_API_KEY'] ?? '';
 
-  // ATENÇÃO: Em uma aplicação real, a API Key não deve ser exposta diretamente no código.
-  // Considere usar variáveis de ambiente ou um serviço de backend seguro.
-  final apiKey =
-      '6eOaXJsaVb1JPixRHmws7NUlyBYBjwaTzvy99y7ksNz4ML0PaAceJQQJ99BEACZoyfiXJ3w3AAABACOGnT9O';
-
-  if (apiKey.isEmpty) {
-    print('❌ API Key não encontrada! Verifique sua configuração.');
+  if (endpoint.isEmpty || apiKey.isEmpty) {
+    debugPrint(
+      '❌ Credenciais do Azure OpenAI não encontradas! '
+      'Verifique AZURE_OPENAI_ENDPOINT e AZURE_OPENAI_API_KEY no arquivo .env.',
+    );
     return null;
   }
 
@@ -74,19 +77,19 @@ Me dê informações sobre a planta "$nomeCientifico". Use obrigatoriamente o se
               parsed['outras_plantas_compatíveis']?.toString() ?? 'N/A',
         };
       } catch (e) {
-        print('⚠️ Erro ao interpretar JSON da resposta da IA: $e');
-        print(
+        debugPrint('⚠️ Erro ao interpretar JSON da resposta da IA: $e');
+        debugPrint(
           'Conteúdo da resposta bruta: $rawResponseContent',
         ); // Ajuda na depuração
         return null;
       }
     } else {
-      print('❌ Erro na resposta da API: ${response.statusCode}');
-      print(response.body); // Imprime o corpo da resposta para depuração
+      debugPrint('❌ Erro na resposta da API: ${response.statusCode}');
+      debugPrint(response.body); // Imprime o corpo da resposta para depuração
       return null;
     }
   } catch (e) {
-    print('❌ Erro ao conectar com Azure OpenAI: $e');
+    debugPrint('❌ Erro ao conectar com Azure OpenAI: $e');
     return null;
   }
 }

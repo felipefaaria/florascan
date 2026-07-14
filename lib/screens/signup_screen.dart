@@ -8,7 +8,7 @@ class SignUpScreen extends StatefulWidget {
   const SignUpScreen({super.key});
 
   @override
-  _SignUpScreenState createState() => _SignUpScreenState();
+  State<SignUpScreen> createState() => _SignUpScreenState();
 }
 
 class _SignUpScreenState extends State<SignUpScreen> {
@@ -17,6 +17,16 @@ class _SignUpScreenState extends State<SignUpScreen> {
   final TextEditingController _phoneController = TextEditingController();
   final TextEditingController _nameController = TextEditingController();
   final TextEditingController _professionController = TextEditingController();
+
+  @override
+  void dispose() {
+    _emailController.dispose();
+    _passwordController.dispose();
+    _phoneController.dispose();
+    _nameController.dispose();
+    _professionController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -101,12 +111,13 @@ class _SignUpScreenState extends State<SignUpScreen> {
               ElevatedButton(
                 onPressed: () async {
                   try {
-                    final credential = await FirebaseAuth.instance
+                    await FirebaseAuth.instance
                         .createUserWithEmailAndPassword(
                           email: _emailController.text.trim(),
                           password: _passwordController.text.trim(),
                         );
 
+                    if (!context.mounted) return;
                     Navigator.pushReplacement(
                       context,
                       MaterialPageRoute(
@@ -130,6 +141,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
                       errorMsg = 'E-mail inválido.';
                     }
 
+                    if (!context.mounted) return;
                     showDialog(
                       context: context,
                       builder:

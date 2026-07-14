@@ -1,9 +1,9 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:flutter_application_1/database/db.dart'; // Importa seu DB
-import 'package:flutter_application_1/utils/ai_service.dart'; // Importa a função da IA
-import 'package:flutter_application_1/widgets/care_detail_card.dart'; // Importa o novo widget de Card
+import 'package:florascan/database/db.dart'; // Importa seu DB
+import 'package:florascan/utils/ai_service.dart'; // Importa a função da IA
+import 'package:florascan/widgets/care_detail_card.dart'; // Importa o novo widget de Card
 
 /// Um modal de tela cheia para exibir detalhes de uma planta.
 /// Permite adicionar cuidados via IA e excluir a planta.
@@ -657,7 +657,7 @@ class _PlantDetailsModalState extends State<PlantDetailsModal> {
                                   .onPlantaExcluida(); // Notifica a Grade para recarregar
                             }
                           } catch (e) {
-                            print('Erro ao excluir planta: $e');
+                            debugPrint('Erro ao excluir planta: $e');
                             if (mounted) {
                               _showMessageOverlay(
                                 'Erro ao excluir planta.',

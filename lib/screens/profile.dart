@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:flutter_application_1/screens/welcome_screen.dart';
-import 'package:flutter_application_1/screens/login_screen.dart';
-import 'package:flutter_application_1/screens/signup_screen.dart';
-import 'package:flutter_application_1/database/db.dart'; // Importa o DB para gerenciar dados do usuário
+import 'package:florascan/screens/welcome_screen.dart';
+import 'package:florascan/screens/login_screen.dart';
+import 'package:florascan/screens/signup_screen.dart';
+import 'package:florascan/database/db.dart'; // Importa o DB para gerenciar dados do usuário
 
 class ProfileScreen extends StatefulWidget {
   // As propriedades userName, userProfession, email, phone não precisam mais ser 'required'
@@ -28,7 +28,7 @@ class ProfileScreen extends StatefulWidget {
   });
 
   @override
-  _ProfileScreenState createState() => _ProfileScreenState();
+  State<ProfileScreen> createState() => _ProfileScreenState();
 }
 
 class _ProfileScreenState extends State<ProfileScreen> {
@@ -123,6 +123,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     try {
       await DB.instance.insertOrUpdateUser(userMapToSave);
 
+      if (!mounted) return;
       setState(() {
         isEditing = false;
         errorMessage = null;
@@ -141,6 +142,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         const SnackBar(content: Text('Perfil atualizado com sucesso!')),
       );
     } catch (e) {
+      if (!mounted) return;
       setState(() {
         errorMessage = "Erro ao salvar perfil: $e";
       });
@@ -480,6 +482,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         ),
                         onPressed: () async {
                           await FirebaseAuth.instance.signOut();
+                          if (!context.mounted) return;
                           Navigator.pushReplacement(
                             context,
                             MaterialPageRoute(

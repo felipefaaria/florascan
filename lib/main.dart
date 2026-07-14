@@ -1,5 +1,5 @@
 import 'dart:io';
-import 'package:flutter_application_1/database/db.dart';
+import 'package:florascan/database/db.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
@@ -7,8 +7,8 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:flutter/foundation.dart'
-    show defaultTargetPlatform, TargetPlatform;
-// import 'package:flutter_dotenv/flutter_dotenv.dart'; // Descomente se estiver usando dotenv
+    show defaultTargetPlatform, TargetPlatform, debugPrint;
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import './screens/signup_screen.dart';
 import './screens/welcome_screen.dart';
@@ -21,11 +21,14 @@ import 'package:path/path.dart'
     as path_pkg; // Usando alias para evitar conflitos de nome
 import 'dart:convert'; // Necessário para jsonDecode/jsonEncode na identificação de planta
 
-import 'package:flutter_application_1/widgets/plant_details_modal.dart'; // Importa o modal componentizado
-// import 'package:flutter_application_1/screens/my_garden_screen.dart'; // Removido, já que o acesso é por botão
+import 'package:florascan/widgets/plant_details_modal.dart'; // Importa o modal componentizado
+// import 'package:florascan/screens/my_garden_screen.dart'; // Removido, já que o acesso é por botão
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Carrega as variaveis de ambiente (chaves de API) do arquivo .env.
+  await dotenv.load(fileName: ".env");
 
   // Inicializa o databaseFactory se for desktop
   if (defaultTargetPlatform == TargetPlatform.windows ||
@@ -35,9 +38,6 @@ void main() async {
     databaseFactory = databaseFactoryFfi;
   }
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
-
-  // Carrega o arquivo .env se for usado
-  // await dotenv.load(fileName: ".env");
 
   runApp(const FloraScanApp());
 }
@@ -111,13 +111,13 @@ class AuthGate extends StatelessWidget {
 }
 
 class HomeScreen extends StatefulWidget {
-  String name;
-  String profession;
-  String email;
-  String phone;
+  final String name;
+  final String profession;
+  final String email;
+  final String phone;
   final String password;
 
-  HomeScreen({
+  const HomeScreen({
     super.key,
     this.name = '',
     this.profession = '',
@@ -127,12 +127,18 @@ class HomeScreen extends StatefulWidget {
   });
 
   @override
-  _HomeScreenState createState() => _HomeScreenState();
+  State<HomeScreen> createState() => _HomeScreenState();
 }
 
 class _HomeScreenState extends State<HomeScreen> {
   int _currentIndex = 0;
   String? lastPhotoPath;
+
+  // Copias editaveis dos dados do usuario (o widget e imutavel).
+  late String _name = widget.name;
+  late String _profession = widget.profession;
+  late String _email = widget.email;
+  late String _phone = widget.phone;
 
   void updateUserInfo(
     String newName,
@@ -141,10 +147,10 @@ class _HomeScreenState extends State<HomeScreen> {
     String newPhone,
   ) {
     setState(() {
-      widget.name = newName;
-      widget.profession = newProfession;
-      widget.email = newEmail;
-      widget.phone = newPhone;
+      _name = newName;
+      _profession = newProfession;
+      _email = newEmail;
+      _phone = newPhone;
     });
   }
 
@@ -183,10 +189,10 @@ class _HomeScreenState extends State<HomeScreen> {
         return Grade();
       case 2:
         return ProfileScreen(
-          userName: widget.name,
-          userProfession: widget.profession,
-          email: widget.email,
-          phone: widget.phone,
+          userName: _name,
+          userProfession: _profession,
+          email: _email,
+          phone: _phone,
           onUpdate: updateUserInfo,
         );
       default:
@@ -218,7 +224,7 @@ class _GradeState extends State<Grade> {
         plantas = dados;
       });
     } catch (e) {
-      print('❌ Erro ao carregar plantas: $e');
+      debugPrint('❌ Erro ao carregar plantas: $e');
       setState(() {
         plantas = [];
       });
@@ -244,8 +250,14 @@ class _GradeState extends State<Grade> {
   }
 
   Future<void> identificarPlanta(String imagePath) async {
+    final apiKey = dotenv.env['PLANTNET_API_KEY'] ?? '';
+    if (apiKey.isEmpty) {
+      debugPrint('❌ PLANTNET_API_KEY não configurada no arquivo .env');
+      return;
+    }
+
     final uri = Uri.parse(
-      'https://my-api.plantnet.org/v2/identify/all?api-key=2b101pP92wbLhY6TqTbkv1lBtO&lang=pt-br&nb-results=3',
+      'https://my-api.plantnet.org/v2/identify/all?api-key=$apiKey&lang=pt-br&nb-results=3',
     );
 
     final request = http.MultipartRequest('POST', uri);
@@ -280,8 +292,8 @@ class _GradeState extends State<Grade> {
                 commonNamesList.map((e) => e.toString()).join(', ').trim();
           }
 
-          print('🌿 Nome científico: $nomeCientifico');
-          print('📚 Nome(s) comum(ns): $nomeComum');
+          debugPrint('🌿 Nome científico: $nomeCientifico');
+          debugPrint('📚 Nome(s) comum(ns): $nomeComum');
 
           if (nomeCientifico.isNotEmpty) {
             try {
@@ -299,19 +311,19 @@ class _GradeState extends State<Grade> {
 
               await carregarPlantas();
             } catch (e) {
-              print('❌ Erro ao salvar planta: $e');
+              debugPrint('❌ Erro ao salvar planta: $e');
             }
           } else {
-            print('❌ Nome da planta é obrigatório.');
+            debugPrint('❌ Nome da planta é obrigatório.');
           }
         } else {
-          print('❌ Nenhum resultado encontrado.');
+          debugPrint('❌ Nenhum resultado encontrado.');
         }
       } else {
-        print('❌ Erro na identificação: ${response.statusCode}');
+        debugPrint('❌ Erro na identificação: ${response.statusCode}');
       }
     } catch (e) {
-      print('❌ Erro ao identificar planta: $e');
+      debugPrint('❌ Erro ao identificar planta: $e');
     }
   }
 

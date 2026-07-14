@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:flutter_application_1/database/db.dart';
-import 'package:flutter_application_1/widgets/plant_details_modal.dart'; // Importa o modal de detalhes
+import 'package:florascan/database/db.dart';
+import 'package:florascan/widgets/plant_details_modal.dart'; // Importa o modal de detalhes
 import 'dart:io'; // Para File.existsSync e Image.file
 
 /// Tela para exibir e gerenciar os jardins (categorias) do usuário e suas plantas.
@@ -50,7 +50,7 @@ class _MyGardenScreenState extends State<MyGardenScreen> {
         _categories = categories;
       });
     } catch (e) {
-      print('❌ Erro ao carregar categorias: $e');
+      debugPrint('❌ Erro ao carregar categorias: $e');
       setState(() {
         _message = 'Erro ao carregar seus jardins.';
       });
@@ -73,7 +73,7 @@ class _MyGardenScreenState extends State<MyGardenScreen> {
         _plantsInSelectedCategory = plants;
       });
     } catch (e) {
-      print('❌ Erro ao carregar plantas do jardim: $e');
+      debugPrint('❌ Erro ao carregar plantas do jardim: $e');
       setState(() {
         _message = 'Erro ao carregar plantas deste jardim.';
       });
@@ -138,7 +138,7 @@ class _MyGardenScreenState extends State<MyGardenScreen> {
                       }
                     }
                   } catch (e) {
-                    print('Erro ao criar jardim: $e');
+                    debugPrint('Erro ao criar jardim: $e');
                     if (mounted) {
                       _showMessage(
                         'Falha ao criar jardim: Erro inesperado.',
